@@ -6,8 +6,8 @@ import csv
 import time
 from nltk.corpus import stopwords
 
-def get_first_soup(headers):
-    r = requests.get("https://archiveofourown.org/works/27227170/chapters/66510343", headers=headers)
+def get_first_soup(headers, url):
+    r = requests.get(url, headers=headers)
     soup = bs4.BeautifulSoup(r.text, 'lxml')
     return soup
 
@@ -42,12 +42,7 @@ def clean_html(soup):
     tokens = nltk.word_tokenize(clean)
     return tokens
 
-def log_voice_things(tokens, title, chapter, thing_total):
-    
-    # create/open output file
-    output_file = open("review.txt", "a")
-    output_file.write("title, chapter, text")
-
+def log_text_feature(tokens, output_file, chapter, thing_total):
     # iterate over entire fic
     for token_index, token in enumerate(tokens):
         # look for instances of voice or tone
@@ -74,13 +69,9 @@ def log_voice_things(tokens, title, chapter, thing_total):
             for i in range(back_iterator + 1, front_iterator):
                 context += tokens[i]
                 context += " "
-            context += "\n"
             # write output to file
-            output_string = title + ", " + chapter + ", \"" + context+ "\""
+            output_string = chapter + ", \"" + context + "\"\n"
             output_file.write(output_string)
-    
-    # close output file
-    output_file.close()
     
     return thing_total
 
@@ -108,37 +99,51 @@ def main():
     # declare headers for request
     headers = {"User-Agent":"Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36"}
     
-    # variable to store Voice Thing Total
-    thing_total = 0
+    # accumulator for text feature total
+    feature_total = 0
+
+    # flag for end of fic
     notAtEndOfFic = True
     
+    url = input("Please enter the url of the first chapter of the fic: ")
+
     # get BS object base html
-    soup = get_first_soup(headers)
+    soup = get_first_soup(headers, url)
     
+    # get fic title
+    title = get_title(soup)
+        
+    # generate output file name
+    output_file_name = title.replace(" ", "_") + "_features.txt"
+
+    # create/open output file
+    output_file = open( output_file_name, "a")
+    output_file.write("chapter, text\n")
+
     while notAtEndOfFic == True:
         # sleep
         time.sleep(5)
-        
-        # loop will start here
-        # get metadata values for output
-        title = get_title(soup)
+
+        # get chapter for output
         chapter = get_chap(soup)
     
         # get list for tokenized fic
         tokens = clean_html(soup)
 
-        # log voice things and get total
-        thing_total = log_voice_things(tokens, title, chapter, thing_total)
+        # log instances of text feature and get total
+        feature_total = log_text_feature(tokens, output_file, chapter, feature_total)
         
         # print thing total to screen
-        print(thing_total)
+        print(feature_total)
 
         if is_there_another_chapter(soup) == True :
             url = get_next_chapter_url(soup)
             r = requests.get(url, headers=headers)
             soup = bs4.BeautifulSoup(r.text, 'lxml')
         else:
+            output_file.close()
             notAtEndOfFic = False
+            
     
 
 
